@@ -67,6 +67,11 @@ class IdronautParser():
                 # Split the line by comma's
                 tokens = line.split(",")
 
+                if len(tokens) == 1:
+                    # For now we'll just quietly skip these, there are a lot of them so will get noisy
+                    # print(f"Skipping line |{line}|, only one token (maybe weird Idronaut file?)")
+                    continue
+
                 # All of the lines in the EASE-OA setup should have 7 tokens. If this line doesn't
                 # have 7 tokens, then something's wrong, we need to investigate. The assert will cause
                 # the program to stop. We want to print the line that's bad so that we can easily track down
@@ -76,14 +81,39 @@ class IdronautParser():
                 # First token is the date, we'll use this special 'strptime' to convert Idronaut's notion of
                 # time into a more standardized Python 'datetime' object -- this will be the 'key' in our
                 # dictionary for this row
-                dt = datetime.strptime(tokens[0], "%d/%m/%Y %H:%M:%S.%f")
+                date_token = tokens[0]
+                if date_token.endswith('**'):
+                    date_token = date_token[:-2]
+                dt = datetime.strptime(date_token, "%d/%m/%Y %H:%M:%S.%f")
 
                 # Occaisionally we're seeing the Idronaut spit out all 0's. If that's the case,
                 # we'll just skip this one (but we print out the time we saw it so that it can be investigated)
-                if all(float(value) == 0 for value in tokens[1:]):
-                    print(f"Skipping all zeros at {dt}")
-                else:
+                good_line = True
+                try:
+                    if all(float(value) == 0 for value in tokens[1:]):
+                        # Leave off investigation of this for now -- we think it was probably happening
+                        # when connected laptop was running out of memory
+                        # print(f"Skipping all zeros at {dt}")
+                        good_line = False
+                except ValueError:
+                    good_line = True
+
+                if good_line:
+                    # But be careful because we've got some tokens that look like '18.35**'
                     self._add_line_values(dt, tokens)
+
+
+    def strip_token(self, value):
+        """
+        Strip off potential '**' appended to value and convert to float
+        we're not sure why Idronaut adds this to some values but until we get an answer from
+        them we'll just quietly treat this as good data
+        """
+        if value.endswith('**'):
+            value = value[:-2]
+        # could put a try here, more debugging info
+        float_val = float(value)
+        return float_val
 
     def _add_line_values(self, dt: datetime, tokens: list):
         """
@@ -91,12 +121,12 @@ class IdronautParser():
         """
         # Because of the way the Idronauts are set up for this experiment, we know that temp_1 is at position 1,
         # salinity at 2, etc. If this setup gets changed (via Redas5) then we'll need to change these values
-        temp_1 = float(tokens[1])
-        salinity = float(tokens[2])
-        do= float(tokens[3])
-        ph = float(tokens[4])
-        turbidity = float(tokens[5])
-        temp_2 = float(tokens[6])
+        temp_1 = self.strip_token(tokens[1])
+        salinity = self.strip_token(tokens[2])
+        do= self.strip_token(tokens[3])
+        ph = self.strip_token(tokens[4])
+        turbidity = self.strip_token(tokens[5])
+        temp_2 = self.strip_token(tokens[6])
 
         row_dict = {TEMPERATURE_1: temp_1,
                     PRACTICAL_SALINITY: salinity,
