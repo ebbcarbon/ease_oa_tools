@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import csv
 
 
@@ -84,7 +84,7 @@ class IdronautParser():
                 date_token = tokens[0]
                 if date_token.endswith('**'):
                     date_token = date_token[:-2]
-                dt = datetime.strptime(date_token, "%d/%m/%Y %H:%M:%S.%f")
+                dt = self.round_seconds(datetime.strptime(date_token, "%d/%m/%Y %H:%M:%S.%f"))
 
                 # Occaisionally we're seeing the Idronaut spit out all 0's. If that's the case,
                 # we'll just skip this one (but we print out the time we saw it so that it can be investigated)
@@ -102,6 +102,12 @@ class IdronautParser():
                     # But be careful because we've got some tokens that look like '18.35**'
                     self._add_line_values(dt, tokens)
 
+    # see https://stackoverflow.com/questions/47792242/rounding-time-off-to-the-nearest-second-python
+    @staticmethod
+    def round_seconds(obj: datetime) -> datetime:
+        if obj.microsecond >= 500_000:
+            obj += timedelta(seconds=1)
+        return obj.replace(microsecond=0)
 
     def strip_token(self, value):
         """
